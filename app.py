@@ -16,41 +16,84 @@ class App():
         self.audio_input = AudioInput(is_verbose=is_verbose)
         self.completion_session = CompletionSession()
         self.state = AppState.LISTENING_FOR_INPUT
+        self.latest_vocal_transcript = None
+
+    def listen_for_input(self) -> AppState:
+        """
+        Listen for audio-input and save to a .wav file.
+        """
+        self.audio_input.listen_and_save() # Blocking call
+        return AppState.SPEECH_TO_TEXT
+
+    def run_speech_to_text(self) -> AppState:
+        """
+        Run speech-to-text conversion using Google Cloud's API.
+        """
+        self.latest_vocal_transcript = transcribe_file( # Blocking call
+            settings.APP_USER_VOCAL_FILE, 
+            is_verbose=self.is_verbose)
+        return AppState.GPT_COMPLETION
+    
+    def run_gpt_completion(self) -> AppState:
+        """
+        Run GPT's completions feature against the `latest_vocal_transcript`.
+        """
+        self.gpt_completion_transcript = self.completion_session.get( # Blocking call
+            prompt=self.latest_vocal_transcript, 
+            is_verbose=self.is_verbose,
+            max_tokens=50)
+        return AppState.TEXT_TO_SPEECH
+    
+    def run_text_to_speech(self) -> AppState:
+        """
+        Run text-to-speech conversion using Google Cloud's API.
+        """
+        generate_audio_from_transcript( # Blocking call
+            filename=settings.APP_GPT_COMPLETION_VOCAL_FILE,
+            transcript=self.gpt_completion_transcript,
+            is_verbose=self.is_verbose)
+        return AppState.PLAYING_OUTPUT
+
+    def play_speech_output(self) -> AppState:
+        """
+        Play the latest audio output.
+        """
+        play_output()
+        return AppState.LISTENING_FOR_INPUT
+
+    def exit_app(self) -> AppState:
+        # Do Nothing
+        return AppState.EXITING_APP
 
     def run(self):
-        # Main app loop
-        while True:
-            try:
+        """
+        Main app loop.
+        """
+        cases = {
+            AppState.LISTENING_FOR_INPUT: self.listen_for_input,
+            AppState.SPEECH_TO_TEXT: self.run_speech_to_text,
+            AppState.GPT_COMPLETION: self.run_gpt_completion,
+            AppState.TEXT_TO_SPEECH: self.run_text_to_speech,
+            AppState.PLAYING_OUTPUT: self.play_speech_output,
+            AppState.EXITING_APP: self.exit_app}
 
-                if self.state == AppState.LISTENING_FOR_INPUT:
-                    self.audio_input.listen_and_save()
-                    self.state = AppState.SPEECH_TO_TEXT
-                
-                elif self.state == AppState.SPEECH_TO_TEXT:
-                    transcript = transcribe_file(settings.APP_USER_VOCAL_FILE, is_verbose=self.is_verbose)
-                    self.state = AppState.GPT_COMPLETION
-                
-                elif self.state == AppState.GPT_COMPLETION:
-                    completion_text = self.completion_session.get(transcript, max_tokens=50, is_verbose=self.is_verbose)
-                    self.state = AppState.TEXT_TO_SPEECH
-                
-                elif self.state == AppState.TEXT_TO_SPEECH:
-                    generate_audio_from_transcript(completion_text, filename=settings.APP_GPT_COMPLETION_VOCAL_FILE, is_verbose=self.is_verbose)
-                    self.state == AppState.PLAYING_OUTPUT
-                
-                elif self.state == AppState.PLAYING_OUTPUT:
-                    play_output()
-                    self.state == AppState.LISTENING_FOR_INPUT
+        try:
+            self.state = cases[self.state]()
 
-            # If Speech-to-text transcription fails, try again.
-            except NoSpeechToTextResults:
-                self.state = AppState.LISTENING_FOR_INPUT
-                continue
+        # If Speech-to-text transcription fails, listen again for voice input.
+        except NoSpeechToTextResults:
+            self.state = AppState.LISTENING_FOR_INPUT
 
-            # If no usable text is returned by GPT, listen again for voice input.
-            except BadCompletionException as e:
-                if self.is_verbose: print(f'Bad GPT completion exception: {e.args}')
-                self.state == AppState.LISTENING_FOR_INPUT
+        # If no usable text is returned by GPT, listen again for voice input.
+        except BadCompletionException as e:
+            if self.is_verbose: print(f'Bad GPT completion exception: {e.args}')
+            self.state == AppState.LISTENING_FOR_INPUT
+        
+        # Keep running or exit app
+        if self.state != AppState.EXITING_APP:
+            self.run()
+        else:
+            print('Exiting app...')
 
 
 

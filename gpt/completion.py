@@ -17,11 +17,11 @@ class BadCompletionException(GPTException):
 class CompletionSession():
 
     DEFAULT_MODEL = 'text-davinci-003'
-    MAX_SESSION_HISTORY_LENGTH = 2 # The number of prompt + answer combinations we want to save.
+    MAX_SESSION_HISTORY_LENGTH = 1 # The number of prompt + answer combinations we want to save.
 
     def __init__(self):
         openai.api_key = settings.CHAT_GPT_API_KEY
-        self.session_history = collections.deque()
+        self.session_history = collections.deque({})
 
     def __get_response_text(self, completion_response) -> str:
         """
@@ -47,15 +47,17 @@ class CompletionSession():
         Build the session history and return as a String.
         """
         history = ''
+        print(self.session_history)
         for phrase in self.session_history:
             history += phrase
+        return history
 
     def __add_to_session_history(self, text: str) -> None:
         """
         Appends a string of text to the session history.
         """
         self.session_history.appendleft(text)
-        if len(self.session_history) >= self.MAX_SESSION_HISTORY_LENGTH * 2:
+        if len(self.session_history) > self.MAX_SESSION_HISTORY_LENGTH * 2:
             self.session_history.pop()
 
     def get(self, prompt, model=DEFAULT_MODEL, is_verbose=True, **kwargs) -> str:
@@ -66,6 +68,7 @@ class CompletionSession():
         if is_verbose: print('* Sending to Chat GPT...')
         self.__add_to_session_history(prompt)
         session_history = self.__get_session_history()
+        print(f'SESSION HISTORY: {session_history}')
         try:
             response = openai.Completion.create(
                 prompt=session_history,
@@ -73,7 +76,7 @@ class CompletionSession():
                 **kwargs)
             completion_text = self.__get_response_text(response)
             self.__add_to_session_history(completion_text)
-            if is_verbose: print('* Received Chat GPT response.')
+            if is_verbose: print(f'* Received Chat GPT response: \n{completion_text}')
             return completion_text
         
         # Wrap any generic exception as a GPT exception

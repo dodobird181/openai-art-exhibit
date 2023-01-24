@@ -1,4 +1,5 @@
 from __future__ import annotations
+import settings
 import pyaudio
 import wave
 import collections
@@ -14,12 +15,12 @@ class AudioInput():
     CHUNK_SIZE = 1024
 
     DEFAULT_RECORD_SECONDS = 5
-    DEFAULT_WAVE_OUTPUT_FILENAME = "file.wav"
+    DEFAULT_WAVE_OUTPUT_FILENAME = settings.APP_USER_VOCAL_FILE
 
     def __init__(self, is_verbose=True):
         self.audio = pyaudio.PyAudio()
         self.is_verbose = is_verbose
-        self.energy_threshold = 5000 # minimum audio energy to consider for recording
+        self.energy_threshold = 3500 # minimum audio energy to consider for recording
         self.pause_threshold = 2 # seconds of quiet time before a phrase is considered complete
         self.quiet_duration = 1 # amount of quiet time to keep on both sides of the recording
 
@@ -120,7 +121,7 @@ class AudioInput():
 
             # check if the audio input has gone quiet for longer than the pause threshold
             energy = audioop.rms(buffer, sample_width) # energy of the audio signal
-            if energy > self.energy_threshold * 0.5:
+            if energy > self.energy_threshold * 0.9:
                 pause_count = 0
             else:
                 pause_count += 1

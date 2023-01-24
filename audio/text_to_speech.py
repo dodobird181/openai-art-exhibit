@@ -7,7 +7,7 @@ Note: ssml must be well-formed according to:
 from google.cloud import texttospeech
 import settings
 
-DEFAULT_AUDIO_OUTPUT_FILENAME = 'output.wav'
+DEFAULT_AUDIO_OUTPUT_FILENAME = settings.APP_USER_VOCAL_FILE
 
 def generate_audio_from_transcript(transcript: str, filename=DEFAULT_AUDIO_OUTPUT_FILENAME, is_verbose=True) -> None:
     """
